@@ -35,10 +35,15 @@ def predict_transport_mode_simple_coarse(triplegs):
     :func:`trackintel.analysis.transport_mode_identification.predict_transport_mode`.
     """
     triplegs = triplegs.copy()
+    
+    if triplegs.crs == None:
+            raise Warning('Your data is not in a projected coordinate system')
+        
 
     def identify_mode(tripleg):
         """Identifies the mode based on the (overall) tripleg speed."""
         # Computes distance over whole tripleg geometry (using the Haversine distance).
+        
         distance = sum([haversine_dist(pt1[0], pt1[1], pt2[0], pt2[1]) for pt1, pt2 \
             in zip(tripleg.geom.coords[:-1], tripleg.geom.coords[1:])])
         duration = (tripleg['finished_at'] - tripleg['started_at']).total_seconds()
