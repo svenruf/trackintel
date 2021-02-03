@@ -166,8 +166,10 @@ def read_locations_csv(*args, **kwargs):
     geo=kwargs.pop('geo','center')
     df = pd.read_csv(*args, **kwargs)
     df = df.rename(columns=columns)
-    df = pd.read_csv(*args, **kwargs)
-    df['center'] = df['center'].apply(wkt.loads)
+    try:
+        df['center'] = df['center'].apply(wkt.loads)
+    except: raise Exception('The locations must have center. Please use the keyword "columns" to rename the column names of your data')
+        
     if 'extent' in df.columns:
         df['extent'] = df['extent'].apply(wkt.loads)
     gdf = gpd.GeoDataFrame(df, geometry=geo)
