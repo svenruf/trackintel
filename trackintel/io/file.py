@@ -10,6 +10,9 @@ def read_positionfixes_csv(*args, **kwargs):
     builds a geopandas GeoDataFrame. This also validates that the ingested data
     conforms to the trackintel understanding of positionfixes (see 
     :doc:`/modules/model`). 
+    
+    In addition to the pandas read_csv keyword arguments, this function provides to rename columns directly while importing
+    by specifying the columnnames in a dictionary, see second example.
 
     Note that this function is primarily useful if data is available in a 
     longitude/latitude format. If your data already contains a WKT column, it
@@ -23,8 +26,11 @@ def read_positionfixes_csv(*args, **kwargs):
     Examples
     --------
     >>> trackintel.read_positionfixes_csv('data.csv')
+    >>> trackintel.read_positionfixes_csv('data.csv', columns={'time':'tracked_at', 'User':'user_id'})
     """
+    columns=kwargs.pop('columns',{})
     df = pd.read_csv(*args, **kwargs)
+    df = df.rename(columns=columns)
     df['geom'] = list(zip(df.longitude, df.latitude))
     df['geom'] = df['geom'].apply(Point)
     df['tracked_at'] = df['tracked_at'].apply(dateutil.parser.parse)
@@ -57,13 +63,22 @@ def read_triplegs_csv(*args, **kwargs):
     """Wraps the pandas read_csv function, extracts a WKT for the leg geometry and
     builds a geopandas GeoDataFrame. This also validates that the ingested data
     conforms to the trackintel understanding of triplegs (see :doc:`/modules/model`).
+    
+    In addition to the pandas read_csv keyword arguments, this function provides to rename columns directly while importing
+    by specifying the columnnames in a dictionary, see example.
 
     Returns
     -------
     GeoDataFrame
         A GeoDataFrame containing the triplegs.
+        
+    Examples
+    --------
+    >>> trackintel.read_triplegs_csv('data.csv', columns={'start_time':'started_at'})
     """
+    columns=kwargs.pop('columns',{})
     df = pd.read_csv(*args, **kwargs)
+    df = df.rename(columns=columns)
     df['geom'] = df['geom'].apply(wkt.loads)
     df['started_at'] = df['started_at'].apply(dateutil.parser.parse)
     df['finished_at'] = df['finished_at'].apply(dateutil.parser.parse)
@@ -94,13 +109,18 @@ def read_staypoints_csv(*args, **kwargs):
     geometry and builds a geopandas GeoDataFrame. This also validates that 
     the ingested data conforms to the trackintel understanding of staypoints 
     (see :doc:`/modules/model`).
+    
+    In addition to the pandas read_csv keyword arguments, this function provides to rename columns directly while importing
+    by specifying the columnnames in a dictionary, see examples in read_triplegs_csv or read_positionfixes_csv.
 
     Returns
     -------
     GeoDataFrame
         A GeoDataFrame containing the staypoints.
     """
+    columns=kwargs.pop('columns',{})
     df = pd.read_csv(*args, **kwargs)
+    df = df.rename(columns=columns)
     df['geom'] = df['geom'].apply(wkt.loads)
     df['started_at'] = df['started_at'].apply(dateutil.parser.parse)
     df['finished_at'] = df['finished_at'].apply(dateutil.parser.parse)
@@ -131,18 +151,28 @@ def read_locations_csv(*args, **kwargs):
     center (and extent) and builds a geopandas GeoDataFrame. This also 
     validates that the ingested data conforms to the trackintel understanding 
     of locations (see :doc:`/modules/model`).
+    
+    In addition to the pandas read_csv keyword arguments, this function provides to rename columns directly while importing
+    by specifying the columnnames in a dictionary, see examples in read_triplegs_csv or read_positionfixes_csv.
+    
+    With keyword argument geo the geometry column can be changed to e.g. 'extent'. The default is 'center'
 
     Returns
     -------
     GeoDataFrame
         A GeoDataFrame containing the locations.
     """
-    # Todo: How to implement flexible geometry names in locations (gdf with potentially 2 geometry columns)
+    columns=kwargs.pop('columns',{})
+    geo=kwargs.pop('geo','center')
     df = pd.read_csv(*args, **kwargs)
-    df['center'] = df['center'].apply(wkt.loads)
+    df = df.rename(columns=columns)
+    try:
+        df['center'] = df['center'].apply(wkt.loads)
+    except: raise Exception('The locations must have center. Please use the keyword "columns" to rename the column names of your data')
+        
     if 'extent' in df.columns:
         df['extent'] = df['extent'].apply(wkt.loads)
-    gdf = gpd.GeoDataFrame(df, geometry='center')
+    gdf = gpd.GeoDataFrame(df, geometry=geo)
     assert gdf.as_locations
     return gdf
 
@@ -170,13 +200,18 @@ def read_trips_csv(*args, **kwargs):
     """Wraps the pandas read_csv function and extraces proper datetimes. This also 
     validates that the ingested data conforms to the trackintel understanding 
     of trips (see :doc:`/modules/model`).
+    
+    In addition to the pandas read_csv keyword arguments, this function provides to rename columns directly while importing
+    by specifying the columnnames in a dictionary, see examples in read_triplegs_csv or read_positionfixes_csv.
 
     Returns
     -------
     DataFrame
         A DataFrame containing the trips.
     """
+    columns=kwargs.pop('columns',{})
     df = pd.read_csv(*args, **kwargs)
+    df = df.rename(columns=columns)
     df['started_at'] = df['started_at'].apply(dateutil.parser.parse)
     df['finished_at'] = df['finished_at'].apply(dateutil.parser.parse)
     assert df.as_trips
