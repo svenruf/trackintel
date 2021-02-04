@@ -25,8 +25,17 @@ class TestTransportModeIdentification:
     def test_check_correct_simple_coarse_identification(self):
         """Assert that the simple-coarse transport mode identification yields the correct results."""
         tpls = ti.read_triplegs_csv('tests/data/triplegs_transport_mode_identification.csv', sep=';')
+        with pytest.raises(Warning):
+            tpls.as_triplegs.predict_transport_mode(method='simple-coarse')
+        tpls = tpls.set_crs(epsg=4326)
         tpls_transport_mode = tpls.as_triplegs.predict_transport_mode(method='simple-coarse')
 
         assert tpls_transport_mode.iloc[0]['mode'] == 'slow_mobility'
         assert tpls_transport_mode.iloc[1]['mode'] == 'motorized_mobility'
         assert tpls_transport_mode.iloc[2]['mode'] == 'fast_mobility'
+
+        tpls_2 = tpls.to_crs(epsg=2056)
+        tpls_transport_mode_2 = tpls_2.as_triplegs.predict_transport_mode(method='simple-coarse')
+        assert tpls_transport_mode_2.iloc[0]['mode'] == 'slow_mobility'
+        assert tpls_transport_mode_2.iloc[1]['mode'] == 'motorized_mobility'
+        assert tpls_transport_mode_2.iloc[2]['mode'] == 'fast_mobility'

@@ -2,6 +2,7 @@
 
 import trackintel as ti
 from trackintel.geogr.distances import haversine_dist
+import geopandas as gpd
 
 
 def predict_transport_mode(triplegs, method='simple-coarse'):
@@ -36,16 +37,22 @@ def predict_transport_mode_simple_coarse(triplegs):
     """
     triplegs = triplegs.copy()
     
+    wgs = False
+    
     if triplegs.crs == None:
             raise Warning('Your data is not in a projected coordinate system')
+    if triplegs.crs == 4326:
+        wgs=True
         
 
-    def identify_mode(tripleg):
+    def identify_mode(tripleg,wgs):
         """Identifies the mode based on the (overall) tripleg speed."""
         # Computes distance over whole tripleg geometry (using the Haversine distance).
-        
-        distance = sum([haversine_dist(pt1[0], pt1[1], pt2[0], pt2[1]) for pt1, pt2 \
-            in zip(tripleg.geom.coords[:-1], tripleg.geom.coords[1:])])
+        if wgs:
+            distance = sum([haversine_dist(pt1[0], pt1[1], pt2[0], pt2[1]) for pt1, pt2 \
+                in zip(tripleg.geom.coords[:-1], tripleg.geom.coords[1:])])
+        else:
+            distance = tripleg.geom.length
         duration = (tripleg['finished_at'] - tripleg['started_at']).total_seconds()
         speed = distance / duration
 
@@ -56,5 +63,5 @@ def predict_transport_mode_simple_coarse(triplegs):
         else:
             return 'fast_mobility'
 
-    triplegs['mode'] = triplegs.apply(identify_mode, axis=1)
+    triplegs['mode'] = triplegs.apply(lambda l: identify_mode(l,wgs), axis=1)
     return triplegs
