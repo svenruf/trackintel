@@ -9,24 +9,24 @@ def smoothen_triplegs(triplegs, tolerance=1.0, preserve_topology=True):
     """Reduces number of points while retaining structure of tripleg. 
     A wrapper function using shapely.simplify():
     https://shapely.readthedocs.io/en/stable/manual.html#object.simplify
-    
+
     Parameters
     ----------
     triplegs: GeoDataFrame
         triplegs to be simplified
-        
+
     tolerance: float, default 1.0
         a higher tolerance removes more points; the units of tolerance are the same as the 
         projection of the input geometry
-    
+
     preserve_topology: bool, default True
         whether to preserve topology. If set to False the Douglas-Peucker algorithm is used.
-    
+
     Returns
     ----------
     GeoDataFrame
         The simplified triplegs GeoDataFrame
-    
+
     """
     ret_tpls = triplegs.copy()
     origin_geom = ret_tpls.geom
@@ -101,11 +101,11 @@ def generate_trips(stps_input, tpls_input, gap_threshold=15, id_offset=0, print_
     spts_tpls.sort_values(by=['user_id', 'started_at'], inplace=True)
     spts_tpls['started_at_next'] = spts_tpls['started_at'].shift(-1)
     spts_tpls['activity_next'] = spts_tpls['activity'].shift(-1)
-    
+
     if print_progress:
         tqdm.pandas(desc='User trip generation')
-        trips = spts_tpls.groupby(['user_id'], 
-                                  group_keys=False, 
+        trips = spts_tpls.groupby(['user_id'],
+                                  group_keys=False,
                                   as_index=False).progress_apply(_generate_trips_user, gap_threshold=gap_threshold).reset_index(drop=True)
     else:
         trips = spts_tpls.groupby(['user_id'], 
