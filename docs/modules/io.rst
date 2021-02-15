@@ -29,6 +29,19 @@ CSV File Import
 
 .. autofunction:: trackintel.io.file.read_trips_csv
 
+GeoDataFrame Import
+===================
+
+.. autofunction:: trackintel.io.from_geopandas.positionfixes_from_gpd
+
+.. autofunction:: trackintel.io.from_geopandas.triplegs_from_gpd
+
+.. autofunction:: trackintel.io.from_geopandas.staypoints_from_gpd
+
+.. autofunction:: trackintel.io.from_geopandas.locations_from_gpd
+
+.. autofunction:: trackintel.io.from_geopandas.trips_from_gpd
+
 PostGIS Import
 ==============
 
