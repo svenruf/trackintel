@@ -197,7 +197,7 @@ def generate_staypoints(positionfixes, method='sliding',
     return ret_pfs, ret_spts
 
 
-def generate_triplegs(positionfixes, staypoints=None, trsh=10*60 *args, **kwargs):
+def generate_triplegs(positionfixes, staypoints=None, gap_threshold=20, *args, **kwargs):
     """Generates triplegs from positionfixes. A tripleg is (for now) defined as anything
     that happens between two consecutive staypoints.
 
@@ -213,6 +213,9 @@ def generate_triplegs(positionfixes, staypoints=None, trsh=10*60 *args, **kwargs
     staypoints : GeoDataFrame, optional
         The staypoints (corresponding to the positionfixes). If this is not passed, the 
         positionfixes need staypoint_id associated with them.
+    
+    gap_threshold : int, optional
+        Maximum allowed temporal gap size in minutes. The default is 20 minutes.
 
     Returns
     -------
@@ -232,11 +235,12 @@ def generate_triplegs(positionfixes, staypoints=None, trsh=10*60 *args, **kwargs
     if staypoints is None and len(ret_pfs['staypoint_id'].unique()) < 2:
         raise ValueError("If staypoints is not defined, positionfixes must have more than 1 staypoint_id.")
 
-    def check_tripleg_on_gaps(pfs_tripleg, trsh):
+    def check_tripleg_on_gaps(pfs_tripleg, gap_threshold):
         for i in range(pfs_tripleg.shape[0]-1):
-            t_diff = pfs_tripleg.iloc[i] - pfs_tripleg.iloc[i+1]
-            if t_diff > trsh:
-                return i
+            t_diff = pfs_tripleg.iloc[i+1].tracked_at - pfs_tripleg.iloc[i].tracked_at 
+            if t_diff.total_seconds()/60 > gap_threshold:
+                return i+1
+                break
 
         return -1
 
@@ -270,7 +274,7 @@ def generate_triplegs(positionfixes, staypoints=None, trsh=10*60 *args, **kwargs
 
                 pfs_tripleg = pfs.iloc[position_first_posfix_tl:position_last_posfix_tl + 1]
 
-                gap_loc = check_tripleg_on_gaps(pfs_tripleg, trsh)
+                gap_loc = check_tripleg_on_gaps(pfs_tripleg, gap_threshold)
 
                 while gap_loc != -1:
                     pfs_tripleg_to_store = pfs_tripleg.iloc[0:gap_loc-1]
@@ -291,7 +295,7 @@ def generate_triplegs(positionfixes, staypoints=None, trsh=10*60 *args, **kwargs
                         })
                         curr_tripleg_id += 1
                     
-                    gap_loc = check_tripleg_on_gaps(pfs_tripleg, trsh)
+                    gap_loc = check_tripleg_on_gaps(pfs_tripleg, gap_threshold)
 
                 started_at = pfs_tripleg['tracked_at'].iloc[0]
                 finished_at = pfs_tripleg['tracked_at'].iloc[-1]
@@ -315,17 +319,44 @@ def generate_triplegs(positionfixes, staypoints=None, trsh=10*60 *args, **kwargs
             stps = stps.to_dict('records')
             for stp1, stp2 in zip(list(stps), list(stps)[1:]):
                 # Get all positionfixes that lie between these two staypoints.
-                pfs_tripleg = pfs[(stp1['finished_at'] <= pfs['tracked_at']) & \
+                pfs_tripleg = pfs[(stp1['finished_at'] <= pfs['tracked_at']) &
                                   (pfs['tracked_at'] <= stp2['started_at'])].sort_values('tracked_at')
 
+                gap_loc = check_tripleg_on_gaps(pfs_tripleg, gap_threshold)
+
+                while gap_loc != -1:
+                    pfs_tripleg_to_store = pfs_tripleg.iloc[0:gap_loc-1]
+                    pfs_tripleg = pfs_tripleg.iloc[gap_loc:-1]
+
+                    started_at = pfs_tripleg_to_store['tracked_at'].iloc[0]
+                    finished_at = pfs_tripleg_to_store['tracked_at'].iloc[-1]
+
+                    coords = list(pfs_tripleg_to_store.geometry.apply(lambda r: (r.x, r.y)))
+
+                    if len(coords) > 1:
+                        generated_triplegs.append({
+                            'id': curr_tripleg_id,
+                            'user_id': user_id_this,
+                            'started_at': started_at,  # pfs_tripleg['tracked_at'].iloc[0],
+                            'finished_at': finished_at,  # pfs_tripleg['tracked_at'].iloc[-1],
+                            'geom': LineString(coords)
+                        })
+                        curr_tripleg_id += 1
+
+                    gap_loc = check_tripleg_on_gaps(pfs_tripleg, gap_threshold)
+
+                started_at = pfs_tripleg['tracked_at'].iloc[0]
+                finished_at = pfs_tripleg['tracked_at'].iloc[-1]
+
                 coords = list(pfs_tripleg.geometry.apply(lambda r: (r.x, r.y)))
+
                 if len(coords) > 1:
                     generated_triplegs.append({
                         'id': curr_tripleg_id,
                         'user_id': user_id_this,
-                        'started_at': pfs_tripleg['tracked_at'].iloc[0],
-                        'finished_at': pfs_tripleg['tracked_at'].iloc[-1],
-                        'geom': LineString(list(pfs_tripleg.geometry.apply(lambda r: (r.x, r.y))))
+                        'started_at': started_at,  # pfs_tripleg['tracked_at'].iloc[0],
+                        'finished_at': finished_at,  # pfs_tripleg['tracked_at'].iloc[-1],
+                        'geom': LineString(coords)
                     })
                     curr_tripleg_id += 1
 
@@ -341,7 +372,7 @@ def generate_triplegs(positionfixes, staypoints=None, trsh=10*60 *args, **kwargs
             }
             for idx, pf in pfs.iterrows():
                 if prev_pf is not None and prev_pf['staypoint_id'] == -1 and pf['staypoint_id'] != -1:
-                    # This tripleg ends. 
+                    # This tripleg ends.
                     pfs.loc[idx, 'tripleg_id'] = curr_tripleg_id
                     curr_tripleg['finished_at'] = pf['tracked_at']
                     curr_tripleg['coords'].append((pf[name_geocol].x, pf[name_geocol].y))
